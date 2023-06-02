@@ -1,0 +1,11 @@
+[package]
+name = "client"
+version = "0.1.1"
+edition = "2021"
+
+[dependencies]
+ratatui = { version = "0.21.0", features = ["all-widgets", "termion"]}
+termion = "2.0"
+tonic.workspace = true
+tokio.workspace = true
+proto = { path = "../proto" }

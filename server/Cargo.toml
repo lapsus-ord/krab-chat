@@ -1,0 +1,9 @@
+[package]
+name = "server"
+version = "0.1.1"
+edition = "2021"
+
+[dependencies]
+tonic.workspace = true
+tokio.workspace = true
+proto = { path = "../proto" }
