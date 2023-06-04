@@ -1,38 +1,23 @@
-use proto::hello_world::{
-    greeter_server::{Greeter, GreeterServer},
-    HelloReply, HelloRequest,
+mod chat_room;
+
+use chat_room::ChatRoom;
+use proto::chat::{
+    chat_server::{Chat, ChatServer},
+    Message,
 };
-use tonic::transport::Server;
-use tonic::{Request, Response, Status};
+use std::collections::HashMap;
+use tokio::sync::mpsc::Sender;
+use tonic::{transport::Server, Request, Response, Status};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::default();
+    let addr = "[::1]:3000".parse()?;
+    let chatroom_1 = ChatRoom::default();
 
     Server::builder()
-        .add_service(GreeterServer::new(greeter))
+        .add_service(ChatServer::new(chatroom_1))
         .serve(addr)
         .await?;
 
     Ok(())
-}
-
-#[derive(Debug, Default)]
-pub struct MyGreeter {}
-
-#[tonic::async_trait]
-impl Greeter for MyGreeter {
-    async fn say_hello(
-        &self,
-        request: Request<HelloRequest>,
-    ) -> Result<Response<HelloReply>, Status> {
-        println!("Got a request: {:?}", request);
-
-        let reply = HelloReply {
-            message: format!("Hello {}!", request.into_inner().name),
-        };
-
-        Ok(Response::new(reply))
-    }
 }
