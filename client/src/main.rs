@@ -1,10 +1,10 @@
-use proto::hello_world::greeter_client::GreeterClient;
-use proto::hello_world::HelloRequest;
+use proto::chat::greeter_client::GreeterClient;
+use proto::chat::HelloRequest;
 use tonic::Request;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = GreeterClient::connect("http://[::1]:50051").await?;
+    let mut client = GreeterClient::connect("http://[::1]:3000").await?;
 
     let request = Request::new(HelloRequest {
         name: "Tonic".into(),
