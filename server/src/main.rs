@@ -1,21 +1,18 @@
-mod chat_room;
+mod channel;
+mod chat_service;
 
-use chat_room::ChatRoomService;
-use proto::chat::{
-    chat_server::{Chat, ChatServer},
-    Message,
-};
-use std::collections::HashMap;
-use tokio::sync::mpsc::Sender;
-use tonic::{transport::Server, Request, Response, Status};
+use crate::chat_service::ChatService;
+use proto::chat::chat_server::ChatServer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:3000".parse()?;
-    let chatroom_1 = ChatRoomService::default();
+    let addr = "[::1]:50051".parse()?;
+    let chat_service = ChatService::default();
 
-    Server::builder()
-        .add_service(ChatServer::new(chatroom_1))
+    println!("Server listening on {}", addr);
+
+    tonic::transport::Server::builder()
+        .add_service(ChatServer::new(chat_service))
         .serve(addr)
         .await?;
 

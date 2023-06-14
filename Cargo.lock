@@ -114,6 +114,7 @@ dependencies = [
  "ratatui",
  "termion",
  "tokio",
+ "tokio-stream",
  "tonic",
 ]
 
@@ -796,6 +797,7 @@ version = "0.1.1"
 dependencies = [
  "proto",
  "tokio",
+ "tokio-stream",
  "tonic",
 ]
 

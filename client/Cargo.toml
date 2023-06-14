@@ -8,4 +8,5 @@ ratatui = { version = "0.21.0", features = ["all-widgets", "termion"]}
 termion = "2.0"
 tonic.workspace = true
 tokio.workspace = true
+tokio-stream.workspace = true
 proto = { path = "../proto" }
