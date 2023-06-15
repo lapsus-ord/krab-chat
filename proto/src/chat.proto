@@ -3,13 +3,11 @@ package chat;
 
 service Chat {
   rpc CreateChannel(ChannelCreateRequest) returns (ChannelResponse);
-  rpc JoinChannel(ChannelSelectRequest) returns (Empty);
-  rpc LeaveChannel(ChannelSelectRequest) returns (Empty);
+  rpc SubscribeChannel(ChannelSelectRequest) returns (stream Message);
+  rpc UnsubscribeChannel(ChannelSelectRequest) returns (Empty);
 
   // To send a chat message from the client to the server
   rpc SendMessage(Message) returns (Empty);
-  // Server streaming RPC method for receiving chat messages from the server
-  rpc ReceiveMessages(Message) returns (stream Message);
 }
 
 message Empty{}
@@ -22,6 +20,7 @@ message ChannelCreateRequest {
 // To select a channel to join or leave
 message ChannelSelectRequest {
   string channel_id = 1;
+  string username = 2;
 }
 
 message ChannelResponse {

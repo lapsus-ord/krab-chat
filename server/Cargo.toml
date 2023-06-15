@@ -8,3 +8,4 @@ tonic.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 proto = { path = "../proto" }
+uuid = { version = "1.3", features = ["v4", "fast-rng", "macro-diagnostics"] }
