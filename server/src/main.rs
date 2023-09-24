@@ -1,5 +1,6 @@
 mod channel;
 mod chat_service;
+mod utils;
 
 use crate::chat_service::ChatService;
 use proto::chat::chat_server::ChatServer;
