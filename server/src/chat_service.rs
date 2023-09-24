@@ -1,81 +1,98 @@
 use crate::channel::Channel;
+use crate::channel_manager::ChannelManager;
+use crate::utils::{str_to_uuid, ResponseStream};
 use proto::chat::chat_server::Chat;
-use proto::chat::{ChannelCreateRequest, ChannelResponse, ChannelSelectRequest, Empty, Message};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Code, Request, Response, Status};
-use uuid::Uuid;
-
-type Channels = Arc<Mutex<HashMap<Uuid, Channel>>>;
+use proto::chat::{
+    ChannelCreateRequest, ChannelCreateResponse, ChannelListResponse, Empty, JoinChannelRequest,
+    JoinChannelResponse, LeaveChannelRequest, Message, SubscribeChannelRequest,
+};
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
+use tonic::{Request, Response, Status};
 
 #[derive(Debug, Default)]
 pub struct ChatService {
-    channels: Channels,
+    channel_manager: ChannelManager,
 }
 
 #[tonic::async_trait]
 impl Chat for ChatService {
-    async fn create_channel(&self, request: Request<ChannelCreateRequest>) -> Result<Response<ChannelResponse>, Status> {
-        let request = request.into_inner();
-        let channel = Channel::new(request.channel_name, request.creator_username);
-        let created_id = channel.id.to_string();
+    async fn create_channel(
+        &self,
+        request: Request<ChannelCreateRequest>,
+    ) -> Result<Response<ChannelCreateResponse>, Status> {
+        let ChannelCreateRequest {
+            channel_name,
+            creator_username,
+        } = request.into_inner();
+        let channel = Channel::new(&channel_name, &creator_username);
 
-        // Add new channel to state
-        let mut channels = self.channels.lock().unwrap();
-        println!("Size: {} channels", &channels.len() + 1);
-        channels.insert(channel.id, channel);
+        self.channel_manager.create_channel(channel.clone())?;
 
-        Ok(Response::new(ChannelResponse { channel_id: created_id }))
+        Ok(Response::new(ChannelCreateResponse {
+            channel: Some(channel.into()),
+        }))
     }
 
-    type SubscribeChannelStream = ReceiverStream<Result<Message, Status>>;
-
-    async fn subscribe_channel(&self, request: Request<ChannelSelectRequest>) -> Result<Response<Self::SubscribeChannelStream>, Status> {
-        let request = request.into_inner();
-        let channel_id = str_to_uuid(&request.channel_id)?;
-
-        let mut channels = self.channels.lock().unwrap();
-        let channel = channels
-            .get_mut(&channel_id)
-            .ok_or_else(|| Status::new(Code::NotFound, "Channel not found"))?;
-
-        channel.add_client(request.username);
-
-        todo!("subscribe to channel sender");
+    async fn get_channel_list(
+        &self,
+        _: Request<Empty>,
+    ) -> Result<Response<ChannelListResponse>, Status> {
+        Ok(Response::new(self.channel_manager.get_channel_list()?))
     }
 
-    async fn unsubscribe_channel(&self, request: Request<ChannelSelectRequest>) -> Result<Response<Empty>, Status> {
-        let request = request.into_inner();
-        let channel_id = str_to_uuid(&request.channel_id)?;
+    async fn join_channel(
+        &self,
+        request: Request<JoinChannelRequest>,
+    ) -> Result<Response<JoinChannelResponse>, Status> {
+        let JoinChannelRequest {
+            channel_id,
+            username,
+        } = request.into_inner();
+        let channel_id = str_to_uuid(&channel_id)?;
+        let added_user_uuid = self
+            .channel_manager
+            .add_user_to_channel(&username, channel_id)?;
 
-        let mut channels = self.channels.lock().unwrap();
-        let channel = channels
-            .get_mut(&channel_id)
-            .ok_or_else(|| Status::new(Code::NotFound, "Channel not found"))?;
+        Ok(Response::new(JoinChannelResponse {
+            internal_user_uuid: added_user_uuid.to_string(),
+        }))
+    }
 
-        channel.remove_client(request.username);
+    async fn leave_channel(
+        &self,
+        request: Request<LeaveChannelRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let LeaveChannelRequest {
+            channel_id,
+            user_uuid,
+        } = request.into_inner();
 
-        todo!("unsubscribe from channel sender");
+        self.channel_manager
+            .remove_user_from_channel(str_to_uuid(&user_uuid)?, str_to_uuid(&channel_id)?)?;
 
-        Ok(Response::new(Empty::default()))
+        Ok(Response::new(Empty {}))
+    }
+
+    type SubscribeChannelStream = ResponseStream<Message>;
+    async fn subscribe_channel(
+        &self,
+        request: Request<SubscribeChannelRequest>,
+    ) -> Result<Response<Self::SubscribeChannelStream>, Status> {
+        let SubscribeChannelRequest { channel_id } = request.into_inner();
+        let rx = self
+            .channel_manager
+            .subscribe_to_channel(str_to_uuid(&channel_id)?)?;
+
+        let stream = BroadcastStream::new(rx).filter_map(|item| item.ok());
+
+        Ok(Response::new(Box::pin(stream)))
     }
 
     async fn send_message(&self, request: Request<Message>) -> Result<Response<Empty>, Status> {
-        let message = request.into_inner();
-        let channel_id = str_to_uuid(&message.channel_id)?;
+        self.channel_manager
+            .broadcast_message(request.into_inner())?;
 
-        let channels = self.channels.lock().unwrap();
-        let channel = channels
-            .get(&channel_id)
-            .ok_or_else(|| Status::new(Code::NotFound, "Channel not found"))?;
-
-        channel.send(message)?;
-
-        Ok(Response::new(Empty::default()))
+        Ok(Response::new(Empty {}))
     }
-}
-
-fn str_to_uuid(input: &str) -> Result<Uuid, Status> {
-    Uuid::parse_str(input).map_err(|_| Status::new(Code::InvalidArgument, "Invalid UUID"))
 }

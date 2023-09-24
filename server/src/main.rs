@@ -1,4 +1,5 @@
 mod channel;
+mod channel_manager;
 mod chat_service;
 mod utils;
 
