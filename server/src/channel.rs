@@ -1,51 +1,60 @@
+use crate::utils::CHANNEL_SIZE;
 use proto::chat::Message;
-use std::collections::HashSet;
-use tokio::sync::broadcast::{Receiver, Sender};
-use tonic::{Code, Status};
+use std::collections::HashMap;
+use tokio::sync::broadcast;
+use tonic::Status;
+use tracing::warn;
 use uuid::Uuid;
 
-static CAPACITY: usize = 8;
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Channel {
     pub id: Uuid,
     pub name: String,
     pub creator: String,
-    pub clients: HashSet<String>,
-    sender: Sender<Message>,
+    pub users: HashMap<Uuid, String>,
+    pub sender: broadcast::Sender<Result<Message, Status>>,
 }
 
 impl Channel {
-    pub fn new(channel_name: String, channel_creator: String) -> Self {
-        Channel {
+    /// Create a new channel, but doesn't add the channel's creator in the user list
+    pub fn new(channel_name: &str, channel_creator: &str) -> Self {
+        let (tx, _) = broadcast::channel::<Result<Message, Status>>(CHANNEL_SIZE);
+        Self {
             id: Uuid::new_v4(),
-            name: channel_name,
-            creator: channel_creator,
-            clients: HashSet::new(),
-            sender: tokio::sync::broadcast::channel(CAPACITY).0,
+            name: channel_name.to_string(),
+            creator: channel_creator.to_string(),
+            users: HashMap::new(),
+            sender: tx,
         }
     }
 
-    pub fn add_client(&mut self, username: String) {
-        todo!()
+    /// Add user to the channel and send back its associated uuid (= user id in the channel)
+    pub fn add_user(&mut self, username: &str) -> Uuid {
+        let user_uuid = Uuid::new_v4();
+        self.users.insert(user_uuid, username.to_string());
+
+        user_uuid
     }
 
-    pub fn remove_client(&mut self, username: String) {
-        todo!()
+    pub fn remove_user(&mut self, uuid: &Uuid) -> Option<String> {
+        self.users.remove(uuid)
     }
 
-    pub fn send(&self, message: Message) -> Result<(), Status> {
-        let username = message.username.clone();
-
-        self.sender.send(message).map_err(|_| {
-            let error_message = format!("Failed to send message of user '{}'", username);
-            Status::new(Code::Internal, error_message)
-        })?;
-
-        Ok(())
+    /// Broadcast new message to all subscribed users of the channel
+    pub fn broadcast(&self, new_message: Message) {
+        if let Err(e) = self.sender.send(Ok(new_message)) {
+            warn!("could not broadcast the message {:?}", e);
+        }
     }
+}
 
-    pub fn subscribe(&self) -> Receiver<Message> {
-        self.sender.subscribe()
+impl From<Channel> for proto::chat::Channel {
+    fn from(value: Channel) -> Self {
+        Self {
+            id: value.id.to_string(),
+            name: value.name,
+            creator: value.creator,
+            user_count: value.users.len() as i32,
+        }
     }
 }
