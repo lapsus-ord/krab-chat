@@ -2,36 +2,66 @@ syntax = "proto3";
 package chat;
 
 service Chat {
-  rpc CreateChannel(ChannelCreateRequest) returns (ChannelResponse);
-  rpc SubscribeChannel(ChannelSelectRequest) returns (stream Message);
-  rpc UnsubscribeChannel(ChannelSelectRequest) returns (Empty);
+  rpc CreateChannel(ChannelCreateRequest) returns (ChannelCreateResponse);
+  rpc GetChannelList(Empty) returns (ChannelListResponse);
 
+  rpc JoinChannel(JoinChannelRequest) returns (JoinChannelResponse);
+  rpc LeaveChannel(LeaveChannelRequest) returns (Empty);
+
+  rpc SubscribeChannel(SubscribeChannelRequest) returns (stream Message);
   // To send a chat message from the client to the server
   rpc SendMessage(Message) returns (Empty);
 }
 
-message Empty{}
-
+// ChannelCreate
 message ChannelCreateRequest {
   string channel_name = 1;
   string creator_username = 2;
 }
 
-// To select a channel to join or leave
-message ChannelSelectRequest {
+message ChannelCreateResponse {
+  Channel channel = 1;
+}
+
+// GetChannelList
+message ChannelListResponse {
+  repeated Channel channels = 1;
+}
+
+// JoinChannel
+message JoinChannelRequest {
   string channel_id = 1;
   string username = 2;
 }
 
-message ChannelResponse {
+message JoinChannelResponse {
+  string internal_user_uuid = 1;
+}
+
+// LeaveChannel
+message LeaveChannelRequest {
+  string channel_id = 1;
+  string user_uuid = 2;
+}
+
+// SubscribeChannel
+message SubscribeChannelRequest {
   string channel_id = 1;
 }
 
-// Chat message structure
+// ---
+// Misc.
+message Empty {}
+
+message Channel {
+  string id = 1;
+  string name = 2;
+  string creator = 3;
+  int32 user_count = 4;
+}
+
 message Message {
   string username = 1;
   string content = 2;
   string channel_id = 3;
 }
-
-
